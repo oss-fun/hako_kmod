@@ -4,6 +4,9 @@
 #include <linux/cdev.h>
 #include <linux/uaccess.h>
 
+#define CHARDEV_BUFFLEN		1024
+static unsigned char chardev_buff[CHARDEV_BUFFLEN];
+
 static int chardev_open(struct inode *inode, struct file *filp)
 {
 	printk(KERN_INFO "device is open.\n");
@@ -26,8 +29,20 @@ static ssize_t chardev_read(struct file *filp, char __user *buff,
 static ssize_t chardev_write(struct file *filp, const char __user *buff,
 			size_t count, loff_t *offp)
 {
+	unsigned long remain;
+
 	printk(KERN_INFO "write to device.\n");
-	return count;
+	if (count > CHARDEV_BUFFLEN)
+		return -EINVAL;
+
+	remain = copy_from_user(chardev_buff, buff, count);
+	if (remain > 0)
+		printk(KERN_INFO "%ld bytes remain in user buffer.\n",
+		       remain);
+	chardev_buff[count - remain] = '\0';
+	printk(KERN_INFO "received string = %s.\n", chardev_buff);
+
+	return count - remain;
 }
 
 static struct file_operations chardev_fops = {
